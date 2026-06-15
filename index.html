@@ -209,7 +209,7 @@
       <label class="campo">Foto do produto (opcional)</label>
       <input type="file" id="in-foto" accept="image/*" onchange="fotoSelecionada(event)">
       <div id="foto-preview"></div>
-      <button class="btn azul" onclick="addProduto()">+ Adicionar produto</button>
+      <button class="btn azul" id="btn-add-prod" onclick="addProduto()">+ Adicionar produto</button>
       <div id="lista-prod" style="margin-top:12px"></div>
     </div>
 
@@ -3275,6 +3275,14 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 /* ========= ESTADO ========= */
 const KEY="meli_wms_sim_v3";
 const CATEGORIAS=["Alimentos","Roupas","Eletrônicos","Calçados","GM"];
+const PRODUTOS_PADRAO=[
+  ["SKU-001","Camiseta Básica","Roupas"],["SKU-002","Calça Jeans","Roupas"],["SKU-003","Moletom com Capuz","Roupas"],["SKU-004","Vestido Floral","Roupas"],
+  ["SKU-005","Tênis de Corrida","Calçados"],["SKU-006","Chuteira Society","Calçados"],["SKU-007","Sandália de Couro","Calçados"],["SKU-008","Bota Cano Alto","Calçados"],
+  ["SKU-009","Fone Bluetooth","Eletrônicos"],["SKU-010","Carregador USB-C","Eletrônicos"],["SKU-011","Mouse Sem Fio","Eletrônicos"],["SKU-012","Teclado Mecânico","Eletrônicos"],
+  ["SKU-013","Barra de Cereal","Alimentos"],["SKU-014","Café em Cápsulas","Alimentos"],["SKU-015","Chocolate 70%","Alimentos"],["SKU-016","Biscoito Integral","Alimentos"],
+  ["SKU-017","Caneca Térmica","GM"],["SKU-018","Garrafa 1L","GM"],["SKU-019","Mochila Notebook","GM"],["SKU-020","Kit Ferramentas","GM"]
+];
+function seedProdutosPadrao(){PRODUTOS_PADRAO.forEach(([s,n,cat])=>{if(!getProd(s))S.products.push({sku:s,name:n,cat});});}
 let S=carregar();
 function estadoInicial(){
   return {bins:[],products:[],toteList:[],flyers:[],benches:[],printers:[],inventory:{},
@@ -3336,10 +3344,11 @@ function abrirScanner(titulo,msg,cb){
   document.getElementById('manual-code').value='';
   document.getElementById('modal-scan').classList.add('on');
   const formatos=(typeof Html5QrcodeSupportedFormats!=='undefined')?[
-    Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.CODE_128,
-    Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.EAN_13,
-    Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.ITF,
-    Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.UPC_A
+    Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.DATA_MATRIX,
+    Html5QrcodeSupportedFormats.AZTEC,Html5QrcodeSupportedFormats.PDF_417,
+    Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.UPC_A
   ]:undefined;
   try{
     scanner=new Html5Qrcode("reader",{formatsToSupport:formatos,verbose:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true}});
@@ -3422,6 +3431,7 @@ function inboundSimular(){
   if(!S.products.length){toast("Cadastre produtos primeiro","err");return;}
   const usadas=new Set(S.inboundTotes.map(t=>t.tote));
   S.orders.forEach(o=>{if(o.toteCat)Object.values(o.toteCat).forEach(c=>usadas.add(c));if(o.tote)usadas.add(o.tote);});
+  Object.keys(S.totes).forEach(c=>usadas.add(c));
   if(S.recebendo)usadas.add(S.recebendo.tote);
   let livres=S.toteList.map(t=>t.code).filter(c=>!usadas.has(c));
   let criadas=0;
@@ -3528,6 +3538,7 @@ function renderConfig(){
   lp.innerHTML=S.products.length?S.products.map(p=>`
     <div class="item">${imgProd(p.sku,36)}
     <div class="txt"><b>${p.name}</b><span>${p.sku} · ${p.cat||'GM'}</span></div>
+    <button class="del" style="color:var(--azul);font-size:18px" onclick="editProduto('${p.sku}')">✎</button>
     <button class="del" onclick="delProd('${p.sku}')">×</button></div>`).join(''):
     `<div class="vazio"><span class="em">🏷️</span>Nenhum produto ainda</div>`;
 
@@ -3571,7 +3582,8 @@ function delBin(code){
   if(Object.values(S.inventory[code]||{}).some(q=>q>0)){if(!confirm("Esse bin tem estoque. Remover mesmo assim?"))return;}
   S.bins=S.bins.filter(b=>b.code!==code);delete S.inventory[code];salvar();renderConfig();
 }
-let _fotoPendente=null;
+let _fotoPendente=null;let _editSku=null;
+function editProduto(sku){const p=getProd(sku);if(!p)return;_editSku=sku;document.getElementById('in-sku').value=p.sku;document.getElementById('in-nome').value=p.name;const ce=document.getElementById('in-cat');if(ce)ce.value=p.cat||'GM';_fotoPendente=p.img||null;const pv=document.getElementById('foto-preview');if(pv)pv.innerHTML=p.img?`<img src="${p.img}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;margin:4px 0">`:'';const b=document.getElementById('btn-add-prod');if(b)b.textContent='💾 Salvar alterações';toast("Editando "+sku,"info");window.scrollTo(0,0);}
 function fotoSelecionada(ev){
   const f=ev.target.files&&ev.target.files[0];if(!f)return;
   const r=new FileReader();
@@ -3596,14 +3608,20 @@ function addProduto(){
   const es=document.getElementById('in-sku'),en=document.getElementById('in-nome');
   const sku=norm(es.value),name=en.value.trim()||sku;
   if(!sku){toast("Informe o SKU","err");return;}
-  if(getProd(sku)){toast("Esse SKU já existe","err");return;}
   const catEl=document.getElementById('in-cat');const cat=catEl?catEl.value:'GM';
-  const prod={sku,name,cat};if(_fotoPendente)prod.img=_fotoPendente;
-  S.products.push(prod);
+  if(_editSku){
+    const p=getProd(_editSku);if(p){p.name=name;p.cat=cat;p.img=_fotoPendente||undefined;}
+    _editSku=null;
+  }else{
+    if(getProd(sku)){toast("Esse SKU já existe","err");return;}
+    const prod={sku,name,cat};if(_fotoPendente)prod.img=_fotoPendente;
+    S.products.push(prod);
+  }
   es.value='';en.value='';_fotoPendente=null;
   const fi=document.getElementById('in-foto');if(fi)fi.value='';
   const pv=document.getElementById('foto-preview');if(pv)pv.innerHTML='';
-  salvar();renderConfig();toast("Produto adicionado","ok");
+  const b=document.getElementById('btn-add-prod');if(b)b.textContent='+ Adicionar produto';
+  salvar();renderConfig();toast("Produto salvo","ok");
 }
 function delProd(sku){S.products=S.products.filter(p=>p.sku!==sku);salvar();renderConfig();}
 function addTote(){
@@ -3641,10 +3659,7 @@ function carregarExemplo(){
   if((S.bins.length||S.products.length)&&!confirm("Isso vai adicionar dados de exemplo. Continuar?"))return;
   ["A-01","A-02","A-03","A-04","A-05","A-06","B-01","B-02","B-03","B-04","B-05","B-06","C-01","C-02","C-03","C-04","C-05","C-06","D-01","D-02","D-03","D-04","D-05","D-06"]
     .forEach(c=>{if(!getBin(c)){S.bins.push({code:c,label:c});S.inventory[c]={};}});
-  [["SKU-001","Camiseta Azul M","Roupas"],["SKU-002","Tênis Corrida 42","Calçados"],["SKU-003","Fone Bluetooth","Eletrônicos"],
-   ["SKU-004","Caneca Térmica","GM"],["SKU-005","Mochila Notebook","GM"],["SKU-006","Carregador USB-C","Eletrônicos"],
-   ["SKU-007","Barra de Cereal","Alimentos"],["SKU-008","Mouse Sem Fio","Eletrônicos"]]
-   .forEach(([s,n,cat])=>{if(!getProd(s))S.products.push({sku:s,name:n,cat});});
+  seedProdutosPadrao();
   ["T-001","T-002","T-003","T-004","T-005","T-006","T-007","T-008","T-009","T-010","T-011","T-012"].forEach(c=>{if(!getTote(c))S.toteList.push({code:c});});
   ["B1","B2","B3","B4","B5","B6"].forEach(c=>{if(!getFlyer(c))S.flyers.push({code:c});});
   ["WT-01","WT-02","WT-03"].forEach(c=>{if(!getBench(c))S.benches.push({code:c});});
@@ -3832,7 +3847,7 @@ function inboundNovaTote(){
     if(t.tipo==='bin'){toast("Isso é um BIN. Bipe a TOTE.","err");return;}
     const code=t.valor;
     if(S.inboundTotes.find(x=>x.tote===code)){toast("Tote "+code+" já está na doca","err");return;}
-    if(S.orders.find(o=>o.tote===code&&o.status!=='empacotado')){toast("Tote "+code+" está em outro processo","err");return;}
+    if(S.totes[code]){toast("Tote "+code+" está em outro processo","err");return;}
     S.recebendo={tote:code,contents:[]};
     salvar();renderInbound();toast("Tote "+code+" aberta — bipe os produtos","ok");
   });
@@ -4113,8 +4128,7 @@ function pickTote(){
     }else{
       if(S.inboundTotes.find(x=>x.tote===code)){toast("Tote "+code+" está na doca (Inbound)","err");return;}
       if(Object.values(o.toteCat).indexOf(code)>=0){toast("Essa tote já é de outra categoria. Bipe uma nova.","err");return;}
-      const emUso=S.orders.find(x=>x.id!==o.id&&x.status!=='empacotado'&&((x.toteCat&&Object.values(x.toteCat).indexOf(code)>=0)||x.tote===code));
-      if(emUso){toast("Tote "+code+" já está em uso","err");return;}
+      if(S.totes[code]){toast("Tote "+code+" já está em uso","err");return;}
       o.toteCat[cat]=code;S.totes[code]={orderId:o.id};
     }
     const toteUsada=o.toteCat[cat];o.tote=toteUsada;
@@ -4150,7 +4164,7 @@ function packingBiparTote(){
       toast("Tote não encontrada ou ainda em coleta: "+code,"err");return;
     }
     pk.orderId=o.id;pk.tote=code;pk.fase='produto';pk.alvoSku=null;pk.flyer=null;
-    pk.lineIdxs=o.lines.map((l,i)=>({l,i})).filter(z=>z.l.tote===code && !z.l.packed).map(z=>z.i);pk.pos=0;
+    pk.lineIdxs=o.lines.map((l,i)=>({l,i})).filter(z=>z.l.tote===code && !z.l.packed).map(z=>z.i);pk.curIdx=null;
     if(S.packingOp){S.packingOp.refs=S.packingOp.refs||[];if(S.packingOp.refs.indexOf(code)<0)S.packingOp.refs.push(code);}
     logEvento('Packing',pk.operador,'tote '+code);
     salvar();renderPacking();toast("Tote "+code+" — bipe os produtos","ok");
@@ -4158,11 +4172,11 @@ function packingBiparTote(){
 }
 function packingBiparProduto(){
   const pk=S.packing;if(!pk)return;const o=S.orders.find(x=>x.id===pk.orderId);
-  const ln=o.lines[pk.lineIdxs[pk.pos]];
-  abrirScanner("Packing · Produto",`Bipe o produto ${ln.sku}`,txt=>{
-    const p=parse(txt);
-    if(p.valor!==ln.sku){toast("Produto errado! Esperado: "+ln.sku,"err");return;}
-    pk.alvoSku=ln.sku;pk.flyer=embalagemAleatoria();pk.fase='flyer';
+  abrirScanner("Packing · Produto","Bipe qualquer produto desta tote",txt=>{
+    const code=parse(txt).valor;
+    const idx=pk.lineIdxs.find(i=>!o.lines[i].packed && o.lines[i].sku===code);
+    if(idx===undefined){toast("Produto não está nesta tote: "+code,"err");return;}
+    pk.curIdx=idx;pk.alvoSku=code;pk.flyer=embalagemAleatoria();pk.fase='flyer';
     salvar();renderPacking();
   });
 }
@@ -4172,15 +4186,17 @@ function packingBiparFlyer(){
     const v=parse(txt).valor;
     if(v!==pk.flyer){toast("Embalagem errada! Use a "+pk.flyer,"err");return;}
     const o=S.orders.find(x=>x.id===pk.orderId);
-    const ln=o.lines[pk.lineIdxs[pk.pos]];ln.packed=true;
+    const ln=o.lines[pk.curIdx];ln.packed=true;
     if(S.packingOp){S.packingOp.qtd=(S.packingOp.qtd||0)+(ln.qty||1);}
-    pk.pos++;pk.alvoSku=null;pk.flyer=null;
-    if(pk.pos>=pk.lineIdxs.length){
+    pk.alvoSku=null;pk.flyer=null;pk.curIdx=null;
+    const restam=pk.lineIdxs.some(i=>!o.lines[i].packed);
+    if(!restam){
       const toteFeita=pk.tote;
-      logEvento('Packing',pk.operador,'tote '+toteFeita+' embalada');
+      if(S.totes[toteFeita])delete S.totes[toteFeita];
+      logEvento('Packing',pk.operador,'tote '+toteFeita+' embalada/liberada');
       if(o.lines.every(l=>l.packed)){o.status='empacotado';logEvento('Packing',pk.operador,'pedido '+o.label+' empacotado');}
-      S.packing={operador:pk.operador,fase:'tote',wt:pk.wt,printer:pk.printer,tote:null,orderId:null,idx:0,lineIdxs:[],pos:0,alvoSku:null,flyer:null};
-      salvar();renderPacking();toast("Tote "+toteFeita+" embalada ✓","ok");return;
+      S.packing={operador:pk.operador,fase:'tote',wt:pk.wt,printer:pk.printer,tote:null,orderId:null,lineIdxs:[],curIdx:null,alvoSku:null,flyer:null};
+      salvar();renderPacking();toast("Tote "+toteFeita+" embalada ✓ e liberada","ok");return;
     }
     pk.fase='produto';salvar();renderPacking();toast("Produto embalado","ok");
   });
@@ -4217,15 +4233,14 @@ function renderPacking(){
         <p class="dica" style="margin-top:6px">Bancada ${pk.wt} · Impressora ${pk.printer}</p>
         <button class="btn amarelo grande" onclick="packingBiparTote()">📷 Bipar a tote</button></div>`;
     }else if(pk.fase==='produto'){
-      const o=S.orders.find(x=>x.id===pk.orderId);const ln=o.lines[pk.lineIdxs[pk.pos]];const p=getProd(ln.sku);const totL=pk.lineIdxs.length;
-      h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b>📦 Tote ${pk.tote} · ${o.label}</b><span>${pk.pos}/${totL}</span></div>
-        <div class="barra-prog"><i style="width:${Math.round(pk.pos/totL*100)}%"></i></div></div>`;
-      h+=`<div class="card" style="text-align:center;padding:24px">
-        <div style="display:flex;justify-content:center;margin-bottom:8px">${imgProd(ln.sku,130)}</div>
-        <div style="font-size:13px;color:var(--texto-fraco)">Próximo produto</div>
-        <div style="font-size:22px;font-weight:800;margin:8px 0">${p?p.name:ln.sku}</div>
-        <div style="color:var(--texto-fraco);font-size:13px">${ln.sku} · ${ln.qty} un</div>
-        <button class="btn amarelo grande" style="margin-top:14px" onclick="packingBiparProduto()">📷 Bipar o produto</button></div>`;
+      const o=S.orders.find(x=>x.id===pk.orderId);
+      const restantes=pk.lineIdxs.filter(i=>!o.lines[i].packed);
+      const totL=pk.lineIdxs.length,feitos=totL-restantes.length;
+      h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b>📦 Tote ${pk.tote} · ${o.label}</b><span>${feitos}/${totL}</span></div>
+        <div class="barra-prog"><i style="width:${Math.round(feitos/totL*100)}%"></i></div></div>`;
+      const lista=restantes.map(i=>{const ln=o.lines[i];const p=getProd(ln.sku);return `<div class="item">${imgProd(ln.sku,36)}<div class="txt"><b>${p?p.name:ln.sku}</b><span>${ln.sku} · ${ln.cat||'GM'}</span></div><span class="tag amar">${ln.qty} un</span></div>`;}).join('');
+      h+=`<div class="card"><h3>Produtos nesta tote (bipe em qualquer ordem)</h3>${lista}</div>`;
+      h+=`<button class="btn amarelo grande" onclick="packingBiparProduto()">📷 Bipar qualquer produto da tote</button>`;
     }else if(pk.fase==='flyer'){
       const p=getProd(pk.alvoSku);
       h+=`<div class="card" style="text-align:center;padding:24px">
@@ -4303,6 +4318,7 @@ function renderEstoque(){
 })();
 
 /* ========= INIT ========= */
+if(!S.products||!S.products.length){seedProdutosPadrao();salvar();}
 irPara('config');
 
 </script>
