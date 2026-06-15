@@ -188,6 +188,12 @@
     </div>
 
     <div class="card">
+      <h3>📟 Dispositivo / Coletor</h3>
+      <p class="dica" style="margin-bottom:10px">Ative para usar o <b>gatilho do coletor Zebra (DataWedge)</b>. O campo de leitura fica em foco e confirma sozinho ao receber Enter — não precisa tocar na tela.</p>
+      <button class="btn cinza" id="btn-coletor" onclick="toggleColetor()">Modo coletor: desligado</button>
+    </div>
+
+    <div class="card">
       <h3>🗄️ Bins de armazenagem (<span id="qtd-bins">0</span>)</h3>
       <label class="campo">Nome do bin (ex.: A-01)</label>
       <input id="in-bin" placeholder="A-01" autocapitalize="characters">
@@ -205,7 +211,7 @@
       <label class="campo">Descrição</label>
       <input id="in-nome" placeholder="Camiseta Azul M">
       <label class="campo">Categoria</label>
-      <select id="in-cat"><option>Alimentos</option><option>Roupas</option><option>Eletrônicos</option><option>Calçados</option><option selected>GM</option></select>
+      <select id="in-cat"><option>Anvisa</option><option>Roupas</option><option>Eletrônicos</option><option>Calçados</option><option selected>GM</option></select>
       <label class="campo">Foto do produto (opcional)</label>
       <input type="file" id="in-foto" accept="image/*" onchange="fotoSelecionada(event)">
       <div id="foto-preview"></div>
@@ -389,8 +395,8 @@
   <div class="alvo-msg" id="scan-msg">Aponte a câmera para o QR / código de barras</div>
   <div id="reader"></div>
   <div class="manual">
-    <label class="campo" style="color:#ccc">Sem câmera? Digite o código manualmente:</label>
-    <input id="manual-code" placeholder="Ex.: A-01 ou SKU-001">
+    <label class="campo" style="color:#ccc">Sem câmera ou usando coletor (gatilho)? Digite/bipe o código:</label>
+    <input id="manual-code" placeholder="Ex.: A-01 ou SKU-001" autocomplete="off" autocorrect="off" autocapitalize="characters" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmarManual();}">
     <button class="btn amarelo" onclick="confirmarManual()">Confirmar código digitado</button>
   </div>
 </div>
@@ -3274,20 +3280,20 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 <script>
 /* ========= ESTADO ========= */
 const KEY="meli_wms_sim_v3";
-const CATEGORIAS=["Alimentos","Roupas","Eletrônicos","Calçados","GM"];
+const CATEGORIAS=["Anvisa","Roupas","Eletrônicos","Calçados","GM"];
 const PRODUTOS_PADRAO=[
-  ["SKU-001","Camiseta Básica","Roupas"],["SKU-002","Calça Jeans","Roupas"],["SKU-003","Moletom com Capuz","Roupas"],["SKU-004","Vestido Floral","Roupas"],
-  ["SKU-005","Tênis de Corrida","Calçados"],["SKU-006","Chuteira Society","Calçados"],["SKU-007","Sandália de Couro","Calçados"],["SKU-008","Bota Cano Alto","Calçados"],
-  ["SKU-009","Fone Bluetooth","Eletrônicos"],["SKU-010","Carregador USB-C","Eletrônicos"],["SKU-011","Mouse Sem Fio","Eletrônicos"],["SKU-012","Teclado Mecânico","Eletrônicos"],
-  ["SKU-013","Barra de Cereal","Alimentos"],["SKU-014","Café em Cápsulas","Alimentos"],["SKU-015","Chocolate 70%","Alimentos"],["SKU-016","Biscoito Integral","Alimentos"],
-  ["SKU-017","Caneca Térmica","GM"],["SKU-018","Garrafa 1L","GM"],["SKU-019","Mochila Notebook","GM"],["SKU-020","Kit Ferramentas","GM"]
+  ["SKU-001","Camiseta Básica","Roupas","👕"],["SKU-002","Calça Jeans","Roupas","👖"],["SKU-003","Moletom com Capuz","Roupas","🧥"],["SKU-004","Vestido Floral","Roupas","👗"],
+  ["SKU-005","Tênis de Corrida","Calçados","👟"],["SKU-006","Chuteira Society","Calçados","👞"],["SKU-007","Sandália de Couro","Calçados","🩴"],["SKU-008","Bota Cano Alto","Calçados","🥾"],
+  ["SKU-009","Fone Bluetooth","Eletrônicos","🎧"],["SKU-010","Carregador USB-C","Eletrônicos","🔌"],["SKU-011","Mouse Sem Fio","Eletrônicos","🖱️"],["SKU-012","Teclado Mecânico","Eletrônicos","⌨️"],
+  ["SKU-013","Whey Protein","Anvisa","🥛"],["SKU-014","Creatina","Anvisa","💊"],
+  ["SKU-015","Caneca Térmica","GM","🍵"],["SKU-016","Garrafa 1L","GM","💧"],["SKU-017","Mochila Notebook","GM","🎒"],["SKU-018","Kit Ferramentas","GM","🧰"]
 ];
-function seedProdutosPadrao(){PRODUTOS_PADRAO.forEach(([s,n,cat])=>{if(!getProd(s))S.products.push({sku:s,name:n,cat});});}
+function seedProdutosPadrao(){PRODUTOS_PADRAO.forEach(([s,n,cat,emoji])=>{if(!getProd(s))S.products.push({sku:s,name:n,cat,emoji});});}
 let S=carregar();
 function estadoInicial(){
   return {bins:[],products:[],toteList:[],flyers:[],benches:[],printers:[],inventory:{},
     inboundTotes:[],recebendo:null,putawayAtivo:null,putawayOp:null,pickingOp:null,packingOp:null,
-    orders:[],totes:{},packing:null,logs:[],produtividade:[],seq:{order:0}};
+    orders:[],totes:{},packing:null,logs:[],produtividade:[],coletor:false,seq:{order:0}};
 }
 function carregar(){
   try{const r=localStorage.getItem(KEY);if(r)return Object.assign(estadoInicial(),JSON.parse(r));}catch(e){}
@@ -3341,8 +3347,10 @@ function abrirScanner(titulo,msg,cb){
   scanCb=cb;scanLock=false;scanAbertoEm=Date.now();
   document.getElementById('scan-titulo').textContent=titulo;
   document.getElementById('scan-msg').textContent=msg||'Aponte a câmera para o QR / código de barras';
-  document.getElementById('manual-code').value='';
+  const _mc=document.getElementById('manual-code');_mc.value='';
+  if(S.coletor){_mc.setAttribute('inputmode','none');}else{_mc.removeAttribute('inputmode');}
   document.getElementById('modal-scan').classList.add('on');
+  if(S.coletor){setTimeout(function(){try{_mc.focus();}catch(e){}},250);}
   const formatos=(typeof Html5QrcodeSupportedFormats!=='undefined')?[
     Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.DATA_MATRIX,
     Html5QrcodeSupportedFormats.AZTEC,Html5QrcodeSupportedFormats.PDF_417,
@@ -3385,6 +3393,7 @@ function parse(txt){
   if(raw.startsWith("PRD|"))return{tipo:'produto',valor:norm(raw.slice(4))};
   if(raw.startsWith("TOTE|"))return{tipo:'tote',valor:norm(raw.slice(5))};
   if(raw.startsWith("FLY|"))return{tipo:'flyer',valor:norm(raw.slice(4))};
+  const _mft=raw.match(/^FT[_\-\s]?B(\d+)$/i);if(_mft)return{tipo:'flyer',valor:'B'+_mft[1]};
   if(raw.startsWith("WT|"))return{tipo:'wt',valor:norm(raw.slice(3))};
   if(raw.startsWith("IMP|"))return{tipo:'impressora',valor:norm(raw.slice(4))};
   return{tipo:'raw',valor:norm(raw)};
@@ -3555,6 +3564,7 @@ function renderConfig(){
     <div class="txt"><b>Flyer ${f.code}</b><span>código: ${f.code}</span></div>
     <button class="del" onclick="delFlyer('${f.code}')">×</button></div>`).join(''):
     `<div class="vazio"><span class="em">✉️</span>Nenhum flyer ainda</div>`;
+  const _bc=document.getElementById('btn-coletor');if(_bc){_bc.textContent='Modo coletor: '+(S.coletor?'LIGADO ✅':'desligado');_bc.className='btn '+(S.coletor?'verde':'cinza');}
   document.getElementById('qtd-wt').textContent=S.benches.length;
   document.getElementById('qtd-imp').textContent=S.printers.length;
   const lw=document.getElementById('lista-wt');
@@ -3601,8 +3611,8 @@ function fotoSelecionada(ev){
 function imgProd(sku,size){
   const p=getProd(sku);size=size||40;
   if(p&&p.img)return `<img src="${p.img}" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:10px;display:block">`;
-  const cat=(p&&p.cat)||'GM';const d=desenhoCat(cat);
-  return `<div title="${cat}" style="width:${size}px;height:${size}px;border-radius:10px;background:${d[1]};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.55)}px">${d[0]}</div>`;
+  const cat=(p&&p.cat)||'GM';const d=desenhoCat(cat);const emoji=(p&&p.emoji)||d[0];
+  return `<div title="${cat}" style="width:${size}px;height:${size}px;border-radius:10px;background:${d[1]};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.6)}px">${emoji}</div>`;
 }
 function addProduto(){
   const es=document.getElementById('in-sku'),en=document.getElementById('in-nome');
@@ -3666,6 +3676,7 @@ function carregarExemplo(){
   ["IMP-01","IMP-02"].forEach(c=>{if(!getPrinter(c))S.printers.push({code:c});});
   salvar();renderConfig();toast("Exemplo carregado","ok");
 }
+function toggleColetor(){S.coletor=!S.coletor;salvar();renderConfig();toast("Modo coletor "+(S.coletor?"LIGADO":"desligado"),"ok");}
 function resetTudo(){if(confirm("Apagar TODA a simulação?")){S=estadoInicial();salvar();irPara('config');toast("Simulação zerada","ok");}}
 function exportar(){
   const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
@@ -3756,7 +3767,7 @@ function dashOcupacao(){
   // por categoria
   const cats=Object.keys(catUn);
   const maxCat=Math.max(1,...cats.map(c=>catUn[c]));
-  const corCat={'Alimentos':'#00A650','Roupas':'#3483FA','Eletrônicos':'#7B61FF','Calçados':'#FF7733','GM':'#FFB300'};
+  const corCat={'Anvisa':'#D6336C','Alimentos':'#00A650','Roupas':'#3483FA','Eletrônicos':'#7B61FF','Calçados':'#FF7733','GM':'#FFB300'};
   const catBars=cats.length?cats.map(c=>`<div style="margin-bottom:10px">
     <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>${desenhoCat(c)[0]} ${c}</span><span>${catUn[c]} un</span></div>
     <div style="background:var(--cinza-borda);border-radius:6px;height:16px;overflow:hidden"><div style="width:${Math.round(catUn[c]/maxCat*100)}%;height:100%;background:${corCat[c]||'#FFB300'}"></div></div></div>`).join(''):'<div class="vazio"><span class="em">📦</span>Sem estoque</div>';
@@ -3797,7 +3808,7 @@ function exportarMonitoramentoCSV(){
   baixarCSV('monitoramento.csv',[head,...rows]);
 }
 function binCategoria(code){const inv=S.inventory[code]||{};for(const s of Object.keys(inv)){if(inv[s]>0){const p=getProd(s);return (p&&p.cat)||'GM';}}return null;}
-function desenhoCat(cat){const m={'Alimentos':['🍎','#E6F7EF'],'Roupas':['👕','#EAF1FF'],'Eletrônicos':['🎧','#EDE7FF'],'Calçados':['👟','#FFF0E6'],'GM':['📦','#FFF7CC']};return m[cat]||m['GM'];}
+function desenhoCat(cat){const m={'Anvisa':['💊','#FCE4EC'],'Alimentos':['🍎','#E6F7EF'],'Roupas':['👕','#EAF1FF'],'Eletrônicos':['🎧','#EDE7FF'],'Calçados':['👟','#FFF0E6'],'GM':['📦','#FFF7CC']};return m[cat]||m['GM'];}
 
 /* ========= IMPRIMIR ========= */
 let subPrint='bins';
@@ -4074,16 +4085,14 @@ function renderExec(){
   }else if(o.fase==='tote'){
     const p=getProd(o.alvoSku);const cat=(getProd(o.alvoSku)||{}).cat||'GM';
     const esp=(o.toteCat&&o.toteCat[cat])||null;
-    const temOutras=o.toteCat&&Object.keys(o.toteCat).length>0;
     const instrHtml=esp
       ?`<p class="dica" style="margin-top:8px">Bipe a tote <b>${esp}</b> (categoria ${cat})</p>`
-      :(temOutras
-        ?`<div class="alerta-vermelho" style="margin-top:10px;font-size:15px">⚠️ Categoria ${cat} diferente — bipe uma <b>NOVA tote</b></div>`
-        :`<p class="dica" style="margin-top:8px">Bipe uma <b>tote vazia</b> para iniciar (categoria ${cat})</p>`);
+      :`<p class="dica" style="margin-top:8px">Bipe uma <b>tote vazia</b> para a categoria <b>${cat}</b></p>`;
+    const erroHtml=o.erroTote?`<div class="alerta-vermelho" style="margin-top:10px;font-size:15px">⚠️ ${o.erroTote}</div>`:'';
     body=`<div class="card" style="text-align:center;padding:24px">
       <div style="display:flex;justify-content:center;margin-bottom:8px">${imgProd(o.alvoSku,90)}</div>
       <div style="font-size:13px;color:var(--texto-fraco)">${p?p.name:o.alvoSku} em mãos · ${cat}</div>
-      ${instrHtml}
+      ${erroHtml}${instrHtml}
       <button class="btn verde grande" onclick="pickTote()">📷 Bipar a tote</button></div>`;
   }
   c.innerHTML=head+body;
@@ -4121,16 +4130,17 @@ function pickTote(){
   const sku=o.alvoSku;const cat=(getProd(sku)||{}).cat||'GM';
   o.toteCat=o.toteCat||{};
   const esp=o.toteCat[cat]||null;
-  abrirScanner("Picking · Tote",esp?`Bipe a tote ${esp} (${cat})`:(Object.keys(o.toteCat).length?`Categoria ${cat} diferente: bipe uma NOVA tote`:`Bipe uma tote vazia (${cat})`),txt=>{
+  abrirScanner("Picking · Tote",esp?`Bipe a tote ${esp} (${cat})`:`Bipe uma tote vazia para ${cat}`,txt=>{
     const code=parse(txt).valor;
     if(esp){
-      if(code!==esp){toast("Categoria "+cat+": use a tote "+esp,"err");return;}
+      if(code!==esp){o.erroTote='Categoria '+cat+': use a tote '+esp;salvar();renderExec();return;}
     }else{
-      if(S.inboundTotes.find(x=>x.tote===code)){toast("Tote "+code+" está na doca (Inbound)","err");return;}
-      if(Object.values(o.toteCat).indexOf(code)>=0){toast("Essa tote já é de outra categoria. Bipe uma nova.","err");return;}
-      if(S.totes[code]){toast("Tote "+code+" já está em uso","err");return;}
+      if(S.inboundTotes.find(x=>x.tote===code)){o.erroTote='Tote '+code+' está na doca (Inbound) — bipe uma tote vazia';salvar();renderExec();return;}
+      if(Object.values(o.toteCat).indexOf(code)>=0){o.erroTote='Tote '+code+' já é de outra categoria — bipe uma tote vazia';salvar();renderExec();return;}
+      if(S.totes[code]){o.erroTote='Tote '+code+' já está em uso — bipe uma tote vazia';salvar();renderExec();return;}
       o.toteCat[cat]=code;S.totes[code]={orderId:o.id};
     }
+    o.erroTote=null;
     const toteUsada=o.toteCat[cat];o.tote=toteUsada;
     if((S.inventory[o.alvoBin]||{})[sku]>0){
       S.inventory[o.alvoBin][sku]-=1;
@@ -4318,7 +4328,10 @@ function renderEstoque(){
 })();
 
 /* ========= INIT ========= */
-if(!S.products||!S.products.length){seedProdutosPadrao();salvar();}
+if(!S.products||!S.products.length){seedProdutosPadrao();}
+if(!S.flyers||!S.flyers.length){["B1","B2","B3","B4","B5","B6"].forEach(c=>{if(!getFlyer(c))S.flyers.push({code:c});});}
+S.products.forEach(p=>{if(!p.emoji){const d=PRODUTOS_PADRAO.find(x=>x[0]===p.sku);if(d)p.emoji=d[3];}});
+salvar();
 irPara('config');
 
 </script>
