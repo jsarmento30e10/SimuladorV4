@@ -3807,6 +3807,7 @@ function exportarMonitoramentoCSV(){
   const rows=d.map(p=>[p.nome,p.pend,p.pctPend+'%',p.real,p.pctReal+'%',p.fin,p.pctFin+'%',p.total]);
   baixarCSV('monitoramento.csv',[head,...rows]);
 }
+function normalizaBin(code){const toks=String(code).split(/[-_\s]+/).filter(t=>/^\d+$/.test(t));if(toks.length<4)return null;return toks.slice(-4).map(t=>String(parseInt(t,10))).join("-");}
 function binCategoria(code){const inv=S.inventory[code]||{};for(const s of Object.keys(inv)){if(inv[s]>0){const p=getProd(s);return (p&&p.cat)||'GM';}}return null;}
 function desenhoCat(cat){const m={'Anvisa':['💊','#FCE4EC'],'Alimentos':['🍎','#E6F7EF'],'Roupas':['👕','#EAF1FF'],'Eletrônicos':['🎧','#EDE7FF'],'Calçados':['👟','#FFF0E6'],'GM':['📦','#FFF7CC']};return m[cat]||m['GM'];}
 
@@ -3970,8 +3971,13 @@ function putawayBiparBin(){
     const b=parse(txt);
     if(b.tipo==='produto'){toast("Isso é um PRODUTO. Bipe um BIN.","err");return;}
     if(b.tipo==='tote'){toast("Isso é uma TOTE. Bipe um BIN.","err");return;}
-    const bin=getBin(b.valor);
-    if(!bin){toast("BIN não cadastrado: "+b.valor,"err");return;}
+    let bin=getBin(b.valor);
+    if(!bin){
+      const nb=normalizaBin(b.valor);
+      if(!nb){toast("Isso não é um BIN válido (formato xxx-xxx-x-x). Bipe um BIN.","err");return;}
+      bin=getBin(nb);
+      if(!bin){S.bins.push({code:nb,label:nb});S.inventory[nb]=S.inventory[nb]||{};bin=getBin(nb);toast("BIN "+nb+" cadastrado automaticamente","ok");}
+    }
     const sku=pa.alvoSku;
     const catSku=(getProd(sku)||{}).cat||'GM';
     const binCat=binCategoria(bin.code);
